@@ -1,4 +1,4 @@
-import sql from '@/app/db';
+import sql from '../db'; 
 
 async function getProfiles(filters = {}) {
   let query = 'SELECT * FROM profiles';
