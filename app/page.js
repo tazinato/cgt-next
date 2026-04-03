@@ -1,211 +1,89 @@
 // app/page.js
-"use client";
+import styles from './page.module.css';
+import Link from 'next/link';
+import Filters from './components/Filters';
+import prisma from './lib/prisma';
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
+export const runtime = 'nodejs';
 
-export default function Home() {
-  const [profiles, setProfiles] = useState([]);
-  const [name, setName] = useState("");
-  const [major, setMajor] = useState("");
-  const [year, setYear] = useState("");
-  const [gpa, setGpa] = useState("");
+async function fetchTitles() {
+  const data = await prisma.profiles.findMany({
+    distinct: ['title'],
+    select: { title: true }
+  });
+  return data.map(item => item.title).sort();
+}
 
-  const fetchProfiles = async (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.major) params.append("major", filters.major);
-    if (filters.year) params.append("year", filters.year);
-    if (filters.name) params.append("name", filters.name);
+async function getData({ title, search }) {
+  const profiles = await prisma.profiles.findMany({
+    where: {
+      AND: [
+        ...(title ? [{ title: { contains: title, mode: 'insensitive' } }] : []),
+        ...(search ? [{ 
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { bio: { contains: search, mode: 'insensitive' } },
+          ] 
+        }] : []),
+      ],
+    },
+    orderBy: { createAt: 'desc' },
+  });
 
-    const res = await fetch(`/api/profiles?${params}`);
-    const data = await res.json();
-    setProfiles(data);
-  };
+  return profiles;
+}
 
-  const handleCreate = async () => {
-    const body = {
-      name,
-      major,
-      year: Number(year),
-      gpa: Number(gpa),
-    };
-
-    const res = await fetch("/api/profiles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (res.ok) {
-      const newProfile = await res.json();
-      setProfiles((prev) => [...prev, newProfile]);
-      // reset form
-      setName("");
-      setMajor("");
-      setYear("");
-      setGpa("");
-    } else {
-      const err = await res.text();
-      alert(`Error: ${err}`);
-    }
-  };
-
-  const handleUpdate = async (id) => {
-    const res = await fetch(`/api/profiles?id=${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gpa: 4.0 }), // example: update GPA
-    });
-
-    if (res.ok) {
-      const updated = await res.json();
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === id ? updated : p))
-      );
-    } else {
-      const err = await res.text();
-      alert(`Error: ${err}`);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    const res = await fetch(`/api/profiles?id=${id}`, { method: "DELETE" });
-    if (res.ok) {
-      setProfiles((prev) => prev.filter((p) => p.id !== id));
-    } else {
-      const err = await res.text();
-      alert(`Error: ${err}`);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfiles(); // initial load
-  }, []);
+export default async function Home({ searchParams }) {
+  const titles = await fetchTitles();
+  const resolvedParams = await searchParams;
+  const { title, search } = resolvedParams ?? {};
+  const profiles = await getData({ title, search });
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="w-full max-w-3xl space-y-8 px-6 py-12">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Profiles Directory</h1>
+        <p className={styles.subtitle}>Discover amazing professionals</p>
+      </div>
 
-        <section>
-          <h2 className="text-xl font-semibold text-black dark:text-zinc-50">
-            Profiles (via API)
-          </h2>
-          <ul className="mt-4 grid gap-2">
-            {profiles.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center gap-4 rounded border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-black"
-              >
-                <span className="flex-1 text-sm text-zinc-900 dark:text-zinc-50">
-                  {p.name}, {p.major} · Year {p.year} · GPA {p.gpa}
-                </span>
-                <button
-                  onClick={() => handleUpdate(p.id)}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Set GPA 4.0
-                </button>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="text-xs text-red-600 hover:underline"
-                >
-                  Delete
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+      <div className={styles.filtersSection}>
+        <Filters searchParams={searchParams} titles={titles} />
+      </div>
 
-        <section>
-          <h2 className="text-xl font-semibold text-black dark:text-zinc-50">
-            Add a New Profile
-          </h2>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleCreate();
-            }}
-            className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
-          >
-            <input
-              placeholder="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="rounded border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-              required
-            />
-            <input
-              placeholder="Major"
-              value={major}
-              onChange={(e) => setMajor(e.target.value)}
-              className="rounded border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-              required
-            />
-            <input
-              type="number"
-              min="1"
-              max="4"
-              placeholder="Year (1–4)"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              className="rounded border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-              required
-            />
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              max="4"
-              placeholder="GPA (0–4)"
-              value={gpa}
-              onChange={(e) => setGpa(e.target.value)}
-              className="rounded border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
-              required
-            />
-            <button
-              type="submit"
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Add Profile
-            </button>
-          </form>
-        </section>
-
-        <section className="flex flex-wrap gap-2">
-          <button
-            onClick={() => fetchProfiles()}
-            className="rounded bg-zinc-200 px-3 py-1 text-sm text-black dark:bg-zinc-800 dark:text-white"
-          >
-            Load All
-          </button>
-          <button
-            onClick={() => fetchProfiles({ major: "CGT" })}
-            className="rounded bg-zinc-200 px-3 py-1 text-sm text-black dark:bg-zinc-800 dark:text-white"
-          >
-            Filter: major=CGT
-          </button>
-          <button
-            onClick={() => fetchProfiles({ year: 3 })}
-            className="rounded bg-zinc-200 px-3 py-1 text-sm text-black dark:bg-zinc-800 dark:text-white"
-          >
-            Filter: year=3
-          </button>
-          <button
-            onClick={() => fetchProfiles({ name: "ava" })}
-            className="rounded bg-zinc-200 px-3 py-1 text-sm text-black dark:bg-zinc-800 dark:text-white"
-          >
-            Filter: name includes "ava"
-          </button>
-        </section>
-      </main>
+      {profiles.length === 0 ? (
+        <div className={styles.noProfiles}>
+          No profiles match your filters.{' '}
+          <Link href="/profiles/new">Add a new profile</Link>
+        </div>
+      ) : (
+        <div className={styles.profilesGrid}>
+          {profiles.map((profile) => (
+            <div key={profile.id} className={styles.profileCard}>
+              {profile.image_url ? (
+                <img 
+                  src={profile.image_url} 
+                  alt={profile.name}
+                  className={styles.profileImage}
+                />
+              ) : (
+                <div className={styles.profileImage}>
+                  {profile.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <h2 className={styles.profileName}>{profile.name}</h2>
+              <p className={styles.profileRole}>{profile.title}</p>
+              {profile.bio && (
+                <p className={styles.profileBio}>{profile.bio}</p>
+              )}
+              <div className={styles.socialLinks}>
+                <a href={`mailto:${profile.email}`} className={styles.socialLink}>
+                  📧 {profile.email}
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
