@@ -11,7 +11,7 @@ function NavBar() {
         </Link>
         <div className="navbar-links">
           <Link href="/">Home</Link>
-          <Link href="/about">About</Link>
+          <Link href="/profiles">Profiles</Link>  
           <Link href="/profiles/new" className="btn-primary">New Profile</Link>
         </div>
       </nav>

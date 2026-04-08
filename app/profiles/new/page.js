@@ -1,24 +1,25 @@
 "use client";
 import { useRef, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import styles from "./AddProfile.module.css";
 
 const stripTags = (s) => String(s ?? "").replace(/<\/?[^>]+>/g, "");
-const trimCollapse = (s) =>
-  String(s ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
+const trimCollapse = (s) => String(s ?? "").trim().replace(/\s+/g, " ");
 
-export default function AddProfile() {
+export default function AddProfile({ existingProfile = null }) {
   const router = useRouter();
+  const params = useParams();
   const nameRef = useRef(null);
+  const isEditMode = !!existingProfile || params?.id;
+  
   const [values, setValues] = useState({
-    name: "",
-    title: "",
-    email: "",
-    bio: "",
+    name: existingProfile?.name || "",
+    title: existingProfile?.title || "",
+    email: existingProfile?.email || "",
+    bio: existingProfile?.bio || "",
     img: null,
   });
+  
   const [errors, setErrors] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,9 +36,8 @@ export default function AddProfile() {
     if (name === "img") {
       const file = files[0];
       if (file && file.size < 1024 * 1024) {
-        // 1MB limit
         setValues((prev) => ({ ...prev, img: files[0] }));
-	setErrors("");
+        setErrors("");
       } else {
         setErrors("Image size should be less than 1MB");
       }
@@ -62,8 +62,11 @@ export default function AddProfile() {
         formData.append("img", img);
       }
 
-      const response = await fetch("/api/profiles", {
-        method: "POST",
+      const endpoint = isEditMode ? `/api/profiles/${existingProfile?.id || params.id}` : "/api/profiles";
+      const method = isEditMode ? "PUT" : "POST";
+
+      const response = await fetch(endpoint, {
+        method,
         body: formData,
       });
 
@@ -72,7 +75,7 @@ export default function AddProfile() {
         throw new Error(errorData.error || "Failed to submit form");
       }
 
-      setSuccess("Profile added successfully!");
+      setSuccess(isEditMode ? "Profile updated!" : "Profile added!");
       setValues({
         name: "",
         title: "",
@@ -81,7 +84,6 @@ export default function AddProfile() {
         img: null,
       });
 
-      // Reset file input
       const fileInput = document.getElementById("img");
       if (fileInput) fileInput.value = "";
 
@@ -95,6 +97,7 @@ export default function AddProfile() {
       setIsSubmitting(false);
     }
   };
+
   return (
     <main>
       <div className="section">
@@ -137,13 +140,12 @@ export default function AddProfile() {
                 required
                 value={bio}
                 onChange={onChange}
-              ></textarea>
+              />
               <label htmlFor="img">Image:</label>
               <input
                 type="file"
                 name="img"
                 id="img"
-                required
                 accept="image/png, image/jpeg, image/jpg, image/gif"
                 onChange={onChange}
               />
@@ -159,7 +161,7 @@ export default function AddProfile() {
                   !img
                 }
               >
-                Add Profile
+                {isSubmitting ? "Saving..." : (isEditMode ? "Update Profile" : "Add Profile")}
               </button>
               {success && <p className={styles.successMessage}>{success}</p>}
             </form>
