@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import styles from "./AuthForm.module.css"; //add your stylesheet
+import styles from "./AuthForm.module.css";
 
 const stripTags = (s) => String(s ?? "").replace(/<\/?[^>]+>/g, "");
 
@@ -27,10 +27,12 @@ const AuthForm = () => {
     setErrors("");
     setData({ email: "", password: "" });
   };
+
   const handleChange = (e) => {
     const { id, value } = e.target;
     setData((prev) => ({ ...prev, [id]: value }));
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors("");
@@ -38,19 +40,21 @@ const AuthForm = () => {
 
     const email = stripTags(data.email);
     const password = stripTags(data.password);
+    
     try {
       if (isLogin) {
         const result = await signIn("credentials", {
-          redirect: true,
+          redirect: false,
           callbackUrl,
           email,
           password,
         });
         if (result?.error) {
           setErrors(result.error);
+        } else if (result?.ok) {
+          router.push(callbackUrl || "/");
         }
       } else {
-        // Registration logic can be added here
         const res = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -60,21 +64,21 @@ const AuthForm = () => {
         if (data.error) {
           setErrors(data.error);
         } else {
-          // Automatically log in the user after successful registration
           const result = await signIn("credentials", {
-            redirect: true,
+            redirect: false,
             callbackUrl,
             email,
             password,
           });
           if (result?.error) {
             setErrors(result.error);
+          } else {
+            router.push(callbackUrl || "/");
           }
         }
       }
     } catch (error) {
       setErrors("An unexpected error occurred. Please try again.");
-      return;
     } finally {
       setIsSubmitting(false);
     }
@@ -84,6 +88,32 @@ const AuthForm = () => {
     <>
       <h1>{isLogin ? "Sign In" : "Register"}</h1>
       {statusMessage && <p className={styles.statusMessage}>{statusMessage}</p>}
+      
+      {/* OAUTH BUTTONS */}
+      <div className={styles.oauthSection}>
+        <button 
+          type="button"
+          onClick={() => signIn("google", { callbackUrl })}
+          className={styles.googleBtn}
+          disabled={isSubmitting}
+        >
+          Sign in with Google
+        </button>
+        <button 
+          type="button"
+          onClick={() => signIn("github", { callbackUrl })}
+          className={styles.githubBtn}
+          disabled={isSubmitting}
+        >
+          Sign in with GitHub
+        </button>
+      </div>
+
+      <div className={styles.divider}>
+        <span>or</span>
+      </div>
+
+      {/* CREDENTIALS FORM */}
       <form onSubmit={handleSubmit} className={styles.authForm}>
         <div>
           <label htmlFor="email">Email</label>
@@ -93,6 +123,7 @@ const AuthForm = () => {
             value={data.email}
             onChange={handleChange}
             required
+            disabled={isSubmitting}
           />
         </div>
         <div>
@@ -103,16 +134,24 @@ const AuthForm = () => {
             value={data.password}
             onChange={handleChange}
             required
+            disabled={isSubmitting}
           />
         </div>
         {errors && <p className={styles.error}>{errors}</p>}
-        <button type="submit" disabled={isSubmitting || !data.email || !data.password}>
-          {isSubmitting ? "Signing in..." : isLogin ? "Sign In" : "Register"}
+        <button 
+          type="submit" 
+          disabled={isSubmitting || !data.email || !data.password}
+        >
+          {isSubmitting 
+            ? "Signing in..." 
+            : isLogin ? "Sign In" : "Register"
+          }
         </button>
       </form>
+
       <div className={styles.toggle}>
         <p>{isLogin ? "Don't have an account?" : "Already have an account?"}</p>
-        <button type="button" onClick={handleToggle}>
+        <button type="button" onClick={handleToggle} disabled={isSubmitting}>
           {isLogin ? "Register" : "Sign In"}
         </button>
       </div>
