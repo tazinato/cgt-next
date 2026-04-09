@@ -14,12 +14,19 @@ datasource db {
 }
 
 model Profiles{
-id Int @id @default(autoincrement())
-name String
-title String
-email String @unique
-bio String
-image_url String
-createAt DateTime @default(now())
-updateAt DateTime @updatedAt
+          id Int @id @default(autoincrement())
+          name String
+          title String
+          email String @unique
+          bio String
+          image_url String
+          createAt DateTime @default(now())
+          updateAt DateTime @updatedAt
 }
+model User{
+            id String @id @default(cuid())
+            email String @unique
+            password String?
+            createdAt DateTime @default(now())
+            updatedAt DateTime @updatedAt
+        }
